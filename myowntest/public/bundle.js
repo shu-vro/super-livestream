@@ -20404,7 +20404,7 @@ const createDevice = async function () {
 const getLocalStream = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: true,
-    audio: false,
+    audio: true,
   });
 
   video.srcObject = stream;
@@ -20467,20 +20467,20 @@ socket.on("connect", () => {
           });
 
           const stream = await getLocalStream();
-          producer = await producerTransport.produce({
-            track: stream.getTracks()[0],
-          });
+          const tracks = stream.getTracks();
 
-          producer.on("trackended", () => {
-            console.log("track ended");
+          const producers = await Promise.all(
+            tracks.map((track) => producerTransport.produce({ track }))
+          );
 
-            // close video track
-          });
+          producers.forEach((producer) => {
+            producer.on("trackended", () => {
+              console.log("track ended");
+            });
 
-          producer.on("transportclose", () => {
-            console.log("transport ended");
-
-            // close video track
+            producer.on("transportclose", () => {
+              console.log("transport ended");
+            });
           });
         }
       );
@@ -20513,22 +20513,36 @@ socket.on("connect", () => {
             "consume",
             {
               rtpCapabilities: device.rtpCapabilities,
-              consumerId: consumerTransport.id,
+              consumerTransportId: consumerTransport.id,
             },
-            async (params) => {
-              console.log("consume", params);
-              const consumer = await consumerTransport.consume(params);
+            async (producers) => {
+              let mediaTracks = [];
 
-              console.log("consumer", consumer);
-              // await consumer.resume();
-              const { track } = consumer;
+              // Create an array of promises for consuming each producer
+              const consumerPromises = producers.map(async (params) => {
+                console.log("consume", params);
+                const consumer = await consumerTransport.consume(params);
 
-              const stream = new MediaStream([track]);
+                console.log("consumer", consumer);
+                // await consumer.resume();
+                const { track } = consumer;
+
+                mediaTracks.push(track);
+
+                socket.emit("consumer-resume", { consumerId: consumer.id });
+
+                return consumer;
+              });
+
+              // Wait for all consume operations to complete
+              await Promise.all(consumerPromises);
+
+              const stream = new MediaStream(mediaTracks);
+
+              console.log(stream);
 
               video.srcObject = stream;
               console.log(stream);
-
-              socket.emit("consumer-resume", { consumerId: consumer.id });
             }
           );
         }

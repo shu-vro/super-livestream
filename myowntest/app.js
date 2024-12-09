@@ -121,9 +121,9 @@ let producerTransport;
  */
 let consumerTransports = [];
 /**
- * @type {mediasoup.types.Producer<mediasoup.types.AppData>}
+ * @type {Record<string, mediasoup.types.Producer<mediasoup.types.AppData>>}
  */
-let producer = null;
+let producer_data = {};
 /**
  * @type {mediasoup.types.Consumer<mediasoup.types.AppData>[]}
  */
@@ -187,7 +187,7 @@ peers.on("connection", (socket) => {
   );
 
   socket.on("produce", async ({ kind, rtpParameters }, callback) => {
-    producer = await producerTransport.produce({
+    const producer = await producerTransport.produce({
       kind,
       rtpParameters,
     });
@@ -195,70 +195,128 @@ peers.on("connection", (socket) => {
     producer.on("transportclose", () => {
       console.log("producer transport closed");
       producer.close();
-      producer = null;
+      producer_data = {};
       producerTransport = null;
     });
 
+    producer_data[producer.kind] = producer;
     callback({ id: producer.id });
   });
 
-  socket.on("consume", async ({ rtpCapabilities, consumerId }, callback) => {
-    try {
-      if (!producer) {
-        callback({ error: "producer not found" });
-        return;
-      }
-      if (
-        router.canConsume({
-          producerId: producer.id,
-          rtpCapabilities,
-        })
-      ) {
-        const selectedConsumerTransport = consumerTransports.find(
-          (t) => t.id === consumerId
-        );
-
-        if (!selectedConsumerTransport) {
-          callback({ error: "consumer transport not found" });
+  socket.on(
+    "consume",
+    async ({ rtpCapabilities, consumerTransportId }, callback) => {
+      try {
+        if (!producer_data) {
+          callback({ error: "producer not found" });
           return;
         }
-        const consumer = await selectedConsumerTransport.consume({
-          producerId: producer.id,
-          rtpCapabilities,
-          paused: true,
-        });
 
-        consumer.on("transportclose", () => {
-          console.log("transport close from consumer");
-          // remove the consumer from the consumers and consumerTransports
-          consumers = consumers.filter((c) => c.id !== consumer.id);
-          selectedConsumerTransport.close();
-          consumerTransports = consumerTransports.filter(
-            (t) => t.id !== selectedConsumerTransport.id
-          );
-        });
+        const consumerPromises = Object.keys(producer_data).map(
+          async (kind) => {
+            const producer = producer_data[kind];
+            if (
+              router.canConsume({
+                producerId: producer.id,
+                rtpCapabilities,
+              })
+            ) {
+              const selectedConsumerTransport = consumerTransports.find(
+                (t) => t.id === consumerTransportId
+              );
 
-        consumer.on("producerclose", () => {
-          console.log("producer of consumer closed");
-        });
+              if (!selectedConsumerTransport) {
+                return { error: "consumer transport not found" };
+              }
 
-        consumers.push(consumer);
+              const consumer = await selectedConsumerTransport.consume({
+                producerId: producer.id,
+                rtpCapabilities,
+                paused: true,
+              });
 
-        const { id, kind, rtpParameters } = consumer;
+              consumer.on("transportclose", () => {
+                console.log("transport close from consumer");
+                // remove the consumer from the consumers and consumerTransports
+                consumers = consumers.filter((c) => c.id !== consumer.id);
+                selectedConsumerTransport.close();
+                consumerTransports = consumerTransports.filter(
+                  (t) => t.id !== selectedConsumerTransport.id
+                );
+              });
 
+              consumer.on("producerclose", () => {
+                console.log("producer of consumer closed");
+              });
+
+              consumers.push(consumer);
+
+              const { id, kind, rtpParameters } = consumer;
+
+              return {
+                id,
+                producerId: producer.id,
+                kind,
+                rtpParameters,
+              };
+            }
+          }
+        );
+
+        const consumerCallbacks = await Promise.all(consumerPromises);
+        callback(consumerCallbacks.filter((result) => result !== undefined));
+        // if (
+        //   router.canConsume({
+        //     producerId: producer_data.id,
+        //     rtpCapabilities,
+        //   })
+        // ) {
+        //   const selectedConsumerTransport = consumerTransports.find(
+        //     (t) => t.id === consumerId
+        //   );
+
+        //   if (!selectedConsumerTransport) {
+        //     callback({ error: "consumer transport not found" });
+        //     return;
+        //   }
+        //   const consumer = await selectedConsumerTransport.consume({
+        //     producerId: producer.id,
+        //     rtpCapabilities,
+        //     paused: true,
+        //   });
+
+        //   consumer.on("transportclose", () => {
+        //     console.log("transport close from consumer");
+        //     // remove the consumer from the consumers and consumerTransports
+        //     consumers = consumers.filter((c) => c.id !== consumer.id);
+        //     selectedConsumerTransport.close();
+        //     consumerTransports = consumerTransports.filter(
+        //       (t) => t.id !== selectedConsumerTransport.id
+        //     );
+        //   });
+
+        //   consumer.on("producerclose", () => {
+        //     console.log("producer of consumer closed");
+        //   });
+
+        //   consumers.push(consumer);
+
+        //   const { id, kind, rtpParameters } = consumer;
+
+        //   callback({
+        //     id,
+        //     producerId: producer.id,
+        //     kind,
+        //     rtpParameters,
+        //   });
+        // }
+      } catch (error) {
         callback({
-          id,
-          producerId: producer.id,
-          kind,
-          rtpParameters,
+          error: error,
         });
       }
-    } catch (error) {
-      callback({
-        error: error,
-      });
     }
-  });
+  );
 
   socket.on("consumer-resume", async ({ consumerId }) => {
     const consumer = consumers.find((c) => c.id === consumerId);
