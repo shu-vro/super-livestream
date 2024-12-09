@@ -27,33 +27,6 @@ httpsServer.listen(3000, () => {
 const io = new Server(httpsServer);
 const peers = io.of("/mediasoup");
 
-// https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerOptions
-// https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-produce
-let params = {
-  // mediasoup params
-  encodings: [
-    {
-      rid: "r0",
-      maxBitrate: 100000,
-      scalabilityMode: "S1T3",
-    },
-    {
-      rid: "r1",
-      maxBitrate: 300000,
-      scalabilityMode: "S1T3",
-    },
-    {
-      rid: "r2",
-      maxBitrate: 900000,
-      scalabilityMode: "S1T3",
-    },
-  ],
-  // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerCodecOptions
-  codecOptions: {
-    videoGoogleStartBitrate: 1000,
-  },
-};
-
 const createWorker = async () => {
   const worker = await mediasoup.createWorker({
     rtcMinPort: 2000,
@@ -93,6 +66,9 @@ const createRouter = async (worker) => {
         },
       },
     ],
+    codecOptions: {
+      videoGoogleStartBitrate: 1000,
+    },
   });
 };
 
@@ -215,6 +191,14 @@ peers.on("connection", (socket) => {
       kind,
       rtpParameters,
     });
+
+    producer.on("transportclose", () => {
+      console.log("producer transport closed");
+      producer.close();
+      producer = null;
+      producerTransport = null;
+    });
+
     callback({ id: producer.id });
   });
 
@@ -246,6 +230,12 @@ peers.on("connection", (socket) => {
 
         consumer.on("transportclose", () => {
           console.log("transport close from consumer");
+          // remove the consumer from the consumers and consumerTransports
+          consumers = consumers.filter((c) => c.id !== consumer.id);
+          selectedConsumerTransport.close();
+          consumerTransports = consumerTransports.filter(
+            (t) => t.id !== selectedConsumerTransport.id
+          );
         });
 
         consumer.on("producerclose", () => {

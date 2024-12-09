@@ -20360,6 +20360,10 @@ const roomId = new URLSearchParams(window.location.search).get("room");
 console.log(roomId);
 
 /**
+ * @type {HTMLVideoElement}
+ */
+const video = document.getElementById("myVideo");
+/**
  * @type {import("socket.io-client").Socket}
  */
 const socket = io("/mediasoup");
@@ -20403,7 +20407,8 @@ const getLocalStream = async () => {
     audio: false,
   });
 
-  document.getElementById("myVideo").srcObject = stream;
+  video.srcObject = stream;
+  video.muted = true;
 
   return stream;
 };
@@ -20518,9 +20523,10 @@ socket.on("connect", () => {
               // await consumer.resume();
               const { track } = consumer;
 
-              document.getElementById("myVideo").srcObject = new MediaStream([
-                track,
-              ]);
+              const stream = new MediaStream([track]);
+
+              video.srcObject = stream;
+              console.log(stream);
 
               socket.emit("consumer-resume", { consumerId: consumer.id });
             }
