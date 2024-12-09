@@ -1,0 +1,25 @@
+{
+    "name": "example1",
+    "version": "1.0.0",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "nodemon index.js",
+        "watch": "watchify public/index.js -o public/bundle.js -v"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "express": "^4.21.1",
+        "httpolyglot": "^0.1.2",
+        "mediasoup": "^3.15.2",
+        "mediasoup-client": "^3.7.17",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.7"
+    }
+}

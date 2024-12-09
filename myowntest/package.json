@@ -1,0 +1,25 @@
+{
+    "name": "myowntest",
+    "version": "1.0.0",
+    "main": "app.js",
+    "scripts": {
+        "dev": "nodemon app.js",
+        "watch": "watchify public/index.js -o public/bundle.js -v"
+    },
+    "type": "module",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "express": "^4.21.1",
+        "httpolyglot": "^0.1.2",
+        "mediasoup": "^3.15.2",
+        "mediasoup-client": "^3.7.18",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.7"
+    }
+}

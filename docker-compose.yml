@@ -1,0 +1,11 @@
+services:
+  linux:
+    container_name: ubuntu-linux
+    image: ubuntu-ms
+    tty: true
+    ports:
+      - "3000:3000"
+      - "2000-2020:2000-2020"
+      # - "10000-10100:10000-10100"
+    volumes:
+      - "./:/usr/src"
