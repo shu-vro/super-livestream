@@ -28,7 +28,7 @@ docker exec -it ubuntu-ms /bin/bash
 Generate SSL certificates using OpenSSL:
 
 ```bash
-openssl req -x509 -newkey rsa:2048 -keyout keytemp.pem -out cert.pem -days 365
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365
 ```
 
 ### Install Dependencies
